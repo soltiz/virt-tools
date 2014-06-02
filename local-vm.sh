@@ -2,7 +2,12 @@
 
 
 allowed_vmnums="0 1 2"
-vmTemplateDisk="/home/cedric/opt/COMC/hyt/tools/openstackpilot/local-template.qcow2"
+
+TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
+
+vmTemplateDisk="${TOOLS_DIR}/local-template.qcow2"
 #rootPart=/dev/rootvg/rootlv
 rootPart=/dev/sda1
 instancesDir="/data/vms"
