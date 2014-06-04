@@ -6,6 +6,8 @@ function errecho () { echo "$*" >&2; }
 function fatal() { errecho "FATAL ERROR: $*"; exit 13; }
 function error() { errecho "ERROR: *$"; }
 function log() { echo "$*"; }
+function errlogger() { cat >&2 ;}
+function logger() { cat ;}
 
 function usage() {
 	errecho "usage: "
@@ -70,6 +72,8 @@ case ${command} in
 		targetIp=$3
 		destPort=$4
 		installRules 
+		log "Installed redirections for private address '${targetIp}' :"
+		listRedirections | logger
         exit $?;    
         ;;
     deactivate )
@@ -79,6 +83,9 @@ case ${command} in
 		targetIp=$3
 		destPort=$4
 		removeRules
+		log "Remaining redirections for private address '${targetIp}' :"
+		listRedirections | logger
+   
         exit $?;    
         ;;
     list )
