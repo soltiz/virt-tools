@@ -9,8 +9,9 @@ function log() { echo "$*"; }
 
 function usage() {
 	errecho "usage: "
-	errecho "    $0 tcp-activate  <srcPort> <targetIp> <destPort>"
-	errecho "    $0 tcp-deactivate  <srcPort> <targetIp> <destPort>"
+	errecho "    $0 activate  tcp|udp <srcPort> <privateIp> <destPort>"
+	errecho "    $0 deactivate  tcp|udp <srcPort> <privateIp> <destPort>"
+	errecho "    $0 list <privateIp>"
 }
 
 function checkArgsNumber() {
@@ -22,9 +23,9 @@ function checkArgsNumber() {
 	fi
 }
 
-function incomingForwardingRule() { echo FORWARD -m state -d ${targetIp} --state NEW,RELATED,ESTABLISHED -j ACCEPT; }
+function incomingForwardingRule() { echo FORWARD -m state -d ${targetIp} -p ${protocol} --dport ${srcPort} --state NEW,RELATED,ESTABLISHED -j ACCEPT; }
 	
-function incomingNatRule() { echo PREROUTING -t nat -p tcp --dport ${srcPort} -j DNAT --to ${targetIp}:${destPort} ;}
+function incomingNatRule() { echo PREROUTING -t nat -p ${protocol} --dport ${srcPort} -j DNAT --to ${targetIp}:${destPort} ;}
 
 function installIPTablesRule() {
 	if ! ( sudo iptables -C $* 2>/dev/null ) ; then
@@ -49,6 +50,9 @@ installRules() {
 	installIPTablesRule $(incomingNatRule)
 }
 
+listRedirections() {
+	sudo iptables -t nat --list PREROUTING | sed -n "s/^DNAT\s\+\b\([a-z]\+\)\b.*dpt:\([-a-zA-Z0-9]\+\)\b\s\+.*\bto:${targetIp}:\([0-9]\+\).*/\1 \2  ===>  \3/p" 
+}
 
 
 command=${1:-}
@@ -59,22 +63,30 @@ case ${command} in
         usage
         exit 0
         ;;
-    tcp-activate )
-		checkArgsNumber 3 $*
-		srcPort=$1
-		targetIp=$2
-		destPort=$3
+    activate )
+		checkArgsNumber 4 $*
+		protocol=$1
+		srcPort=$2
+		targetIp=$3
+		destPort=$4
 		installRules 
-        exit 0;    
+        exit $?;    
         ;;
-    tcp-deactivate )
-		checkArgsNumber 3 $*
-		srcPort=$1
-		targetIp=$2
-		destPort=$3
-		removeRules 
-        exit 0;    
+    deactivate )
+		checkArgsNumber 4 $*
+		protocol=$1
+		srcPort=$2
+		targetIp=$3
+		destPort=$4
+		removeRules
+        exit $?;    
         ;;
+    list )
+		checkArgsNumber 1 $*
+		targetIp=$1
+		listRedirections
+		exit $?;
+		;;
     '' )
 		usage
 		fatal "A command must be provided"
