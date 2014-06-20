@@ -16,6 +16,8 @@ function usage() {
 	errecho "    $0 list <privateIp>"
 }
 
+localIp=10.2.2.2
+echo "Local IP is $localIp. (otherwise edit script)"
 function checkArgsNumber() {
 	expectedNb=$1
 	shift 
@@ -24,8 +26,7 @@ function checkArgsNumber() {
 		fatal "Arguments do not match expected arguments count for command ${command}"
 	fi
 }
-
-function incomingForwardingRule() { echo FORWARD -m state -d ${targetIp} -p ${protocol} --dport ${srcPort} --state NEW,RELATED,ESTABLISHED -j ACCEPT; }
+function incomingForwardingRule() { echo FORWARD -m state -d ${localIp} -p ${protocol} --dport ${srcPort} --state NEW,RELATED,ESTABLISHED -j ACCEPT; }
 	
 function incomingNatRule() { echo PREROUTING -t nat -p ${protocol} --dport ${srcPort} -j DNAT --to ${targetIp}:${destPort} ;}
 
@@ -53,7 +54,7 @@ installRules() {
 }
 
 listRedirections() {
-	sudo iptables -t nat --list PREROUTING | sed -n "s/^DNAT\s\+\b\([a-z]\+\)\b.*dpt:\([-a-zA-Z0-9]\+\)\b\s\+.*\bto:${targetIp}:\([0-9]\+\).*/\1 \2  ===>  \3/p" 
+	sudo iptables -t nat --list PREROUTING | sed -n "s/^DNAT\s\+\b\([a-z]\+\)\b.*dpt:\([-a-zA-Z0-9]\+\)\b\s\+.*\bto:${targetIp}:\([0-9]\+\).*/\1 ${localIp} : \2  ===>  ${targetIp} : \3/p" 
 }
 
 
