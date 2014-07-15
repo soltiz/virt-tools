@@ -16,7 +16,7 @@ function usage() {
 	errecho "    $0 list <privateIp>"
 }
 
-localIp=10.2.2.2
+localIp=192.168.0.30
 echo "Local IP is $localIp. (otherwise edit script)"
 function checkArgsNumber() {
 	expectedNb=$1
@@ -28,10 +28,11 @@ function checkArgsNumber() {
 }
 function incomingForwardingRule() { echo FORWARD -m state -d ${localIp} -p ${protocol} --dport ${srcPort} --state NEW,RELATED,ESTABLISHED -j ACCEPT; }
 	
-function incomingNatRule() { echo PREROUTING -t nat -p ${protocol} --dport ${srcPort} -j DNAT --to ${targetIp}:${destPort} ;}
+function incomingNatRule() { echo PREROUTING -t nat -d ${localIp} -p ${protocol} --dport ${srcPort} -j DNAT --to ${targetIp}:${destPort} ;}
 
 function installIPTablesRule() {
 	if ! ( sudo iptables -C $* 2>/dev/null ) ; then
+		echo iptables -I $*
 		sudo iptables -I $*
 	fi
 }

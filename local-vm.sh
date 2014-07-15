@@ -1,7 +1,7 @@
 #!/bin/bash -u
 
 
-allowed_vmnums="0 1 2"
+allowed_vmnums="0 1 2 3 4 5 6"
 
 TOOLS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -15,10 +15,27 @@ instancesDir="/data/vms"
 ips[0]="192.168.122.10"
 ips[1]="192.168.122.11"
 ips[2]="192.168.122.12"
+ips[3]="192.168.122.13"
+ips[4]="192.168.122.14"
+ips[5]="192.168.123.15"
+ips[6]="192.168.123.16"
 
+gatewayIps[0]="192.168.122.1"
+gatewayIps[1]="192.168.122.1"
+gatewayIps[2]="192.168.122.1"
+gatewayIps[3]="192.168.122.1"
+gatewayIps[4]="192.168.122.1"
+gatewayIps[5]="192.168.123.1"
+gatewayIps[6]="192.168.123.1"
+
+bridges[0]="virbr0"
+bridges[1]="virbr0"
+bridges[2]="virbr0"
+bridges[3]="virbr0"
+bridges[4]="virbr0"
+bridges[5]="virbr1"
+bridges[6]="virbr1"
 vmNetMask=255.255.255.0
-gatewayIp=192.168.122.1
-dnsServers=${gatewayIp}
 dnsDomain=localdomain
 
 ram=512
@@ -144,9 +161,9 @@ fi
 function defineAndStart() {
  hostname="$1"
  diskFile="$2"
- dataDisk="${3:-}"
+ bridge="$3"
  log "Starting vm '${hostname}' with diskFile '${diskFile}' ..."
-   sudo virt-install -q --connect=qemu:///system --network=bridge:virbr0 --disk path="${diskFile}",format=qcow2 --check-cpu --hvm --ram ${ram} --vcpus=${vcpus} --name="${hostname}" --import --graphics vnc,keymap=fr --noautoconsole | logger
+   sudo virt-install -q --connect=qemu:///system --network=bridge:$bridge --disk path="${diskFile}",format=qcow2 --check-cpu --hvm --ram ${ram} --vcpus=${vcpus} --name="${hostname}" --import --graphics vnc,keymap=fr --noautoconsole | logger
  }
 
 function vmStatus() {
@@ -164,6 +181,8 @@ function createVmDiskFile () {
  targetDiskFile="$1"
  hostname="$2"
  vmIp="$3"
+ gatewayIp="$4"
+ dnsServers=${gatewayIp}
  log "creating new disk file '${targetDiskFile}' with inbuilt static IP '${vmIp}' ..." 
  sudo rm -f "${targetDiskFile}"
  sudo qemu-img create -b "${vmTemplateDisk}" -f qcow2 "${targetDiskFile}" | logger
@@ -186,6 +205,7 @@ ENDOFFILE
  	dns-search ${dnsDomain}
 ENDOFFILE
  tmpHostname=$(mktemp)
+ tmpHosts=$(mktemp)
  echo -n "${hostname}" > "${tmpHostname}"
  sudo guestfish --rw -a "${targetDiskFile}"   << ENDGUESTFISH
 run
@@ -193,10 +213,13 @@ mount ${rootPart} /
 upload "${tmpHostname}" /etc/hostname
 upload "${tmpInterfaces}" /etc/network/interfaces
 upload "${tmpInterface}" /etc/network/interfaces.d/eth0.cfg
+download "/etc/hosts" "${tmpHosts}"
+!sed -i 's/.*aptcache.*/${gatewayIp} aptcache/g' "${tmpHosts}"
+upload "${tmpHosts}" /etc/hosts
 quit
 ENDGUESTFISH
 
-sudo rm -rf "${tmpHostname}" "${tmpInterface}" "${tmpInterfaces}"
+sudo rm -rf "${tmpHostname}" "${tmpInterface}" "${tmpInterfaces}" "${tmpHosts}"
 } 
 
 function stopVm () {
@@ -237,6 +260,8 @@ fi
 
 
 vmIp="${ips[vmnum]}"
+gatewayIp="${gatewayIps[vmnum]}"
+bridge="${bridges[vmnum]}"
 
 status="$(vmStatus ${vmHostname})"
 case "${status}" in
@@ -250,16 +275,16 @@ case "${status}" in
 					requestConfirmOrFail "Disk file '${vmDiskFile}' already exists. Do you confirm destruction of disk content ? "
 				fi
 			fi
-			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}"
+			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
 		fi
-		defineAndStart ${vmHostname} ${vmDiskFile}
+		defineAndStart ${vmHostname} ${vmDiskFile} ${bridge}
 		;;
 
 	"shut off" | "fermé")
 		log "Vm '${vmHostname}' already exists, although currently shut off."
 		if [ ${vmnum} -ne 0 ]; then
 			requestConfirmOrFail "Do you confirm disk destruction of vm '${vmHostname}' ?"		
-			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}"
+			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
 		fi
 		startVm "${vmHostname}"
         ;;
@@ -271,7 +296,7 @@ case "${status}" in
 		fi
 		requestConfirmOrFail "Do you confirm stop and disk destruction of vm '${vmHostname}' ?"
         stopVm "${vmHostname}"
-		createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}"
+		createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
 		startVm "${vmHostname}"
 		;;
 
