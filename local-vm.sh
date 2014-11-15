@@ -103,6 +103,7 @@ function print-usage() {
 	done
     errecho "-f flag is required to owerwrite a running vm (which will stop running VM, then destroy its disk)"
     errecho "-q flag removes all logs and normal messages"
+    errecho "-k flag keeps existing disk"
 }
 
 if ! ( sudo ls / >> /dev/null )
@@ -124,12 +125,15 @@ fi
 force=false
 quiet=false
 k1disk=false
-
+keep=false
 while [ "$#" -gt 1 ]
 do
 	case "$1" in
 		"-f")
 			force=true
+			;;
+		"-k")
+			keep=true
 			;;
 		"-q")
 			quiet=true
@@ -268,21 +272,23 @@ case "${status}" in
 	"undefined")
 		log "Vm '${vmHostname}' is undefined in virsh."
 		if [ ${vmnum} -ne 0 ]; then
-			if [ -f "${vmDiskFile}" ]
+			if [ -f "${vmDiskFile}" ] && [ $keep != true ]
 			then
 				if [ "${force}" != "true" ]
 				then
 					requestConfirmOrFail "Disk file '${vmDiskFile}' already exists. Do you confirm destruction of disk content ? "
 				fi
 			fi
-			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
+			if [ $keep != true ]; then
+				createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
+			fi
 		fi
 		defineAndStart ${vmHostname} ${vmDiskFile} ${bridge}
 		;;
 
 	"shut off" | "fermé")
 		log "Vm '${vmHostname}' already exists, although currently shut off."
-		if [ ${vmnum} -ne 0 ]; then
+		if [ ${vmnum} -ne 0 ] && [ $keep != true ]; then
 			requestConfirmOrFail "Do you confirm disk destruction of vm '${vmHostname}' ?"		
 			createVmDiskFile "${vmDiskFile}" "${vmHostname}" "${vmIp}" "${gatewayIp}"
 		fi
@@ -291,7 +297,7 @@ case "${status}" in
 
 	"running" | "en cours d'exécution" )
 		log "Vm '${vmHostname}' is running."
-		if [ ${vmnum} -eq 0 ]; then
+		if [ ${vmnum} -eq 0 ] || [ $keep == true ]; then
 			exit 0
 		fi
 		requestConfirmOrFail "Do you confirm stop and disk destruction of vm '${vmHostname}' ?"

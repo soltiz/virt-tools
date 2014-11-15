@@ -16,7 +16,7 @@ function usage() {
 	errecho "    $0 list <privateIp>"
 }
 
-localIp=192.168.0.30
+localIp=172.23.4.49
 echo "Local IP is $localIp. (otherwise edit script)"
 function checkArgsNumber() {
 	expectedNb=$1
